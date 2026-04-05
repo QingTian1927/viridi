@@ -236,7 +236,7 @@ With default schedules, this should stay within free tiers:
 
 ## License
 
-MIT
+GPL-3.0
 
 ---
 
