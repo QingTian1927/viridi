@@ -1,0 +1,45 @@
+name: Daily Summary
+
+permissions:
+  contents: read
+
+concurrency:
+  group: viridi-daily-summary
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # 23:30 ICT = 16:30 UTC
+    - cron: '30 16 * * *'
+  # Allow manual triggering for testing
+  workflow_dispatch:
+
+jobs:
+  daily-summary:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run daily summary
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}
+          ALERT_TO_EMAIL: ${{ secrets.ALERT_TO_EMAIL }}
+          TZ: Asia/Ho_Chi_Minh
+        run: npm run check:summary
