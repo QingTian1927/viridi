@@ -1,20 +1,27 @@
 /**
- * Gasoline price parser for PVOil Vietnam
- * Extracts RON95-III and E5 RON92-II prices from https://www.pvoil.com.vn/tin-gia-xang-dau
+ * Gasoline price parser for webgia.com Petrolimex prices
+ * Extracts RON95-III and E5 RON92-II prices from https://webgia.com/gia-xang-dau/petrolimex/
  */
 
 import { load } from "cheerio";
 import { GasPrice, ParseResult } from "../types.js";
 import { isValidGasPrice, parsePrice } from "../utils/validators.js";
 
-const PVOIL_URL = "https://www.pvoil.com.vn/tin-gia-xang-dau";
+const WEBGIA_URL = "https://webgia.com/gia-xang-dau/petrolimex/";
+const WEBGIA_HEADERS = {
+  "user-agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  accept:
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "accept-language": "vi-VN,vi;q=0.9,en;q=0.8",
+};
 
 /**
- * Fetch gasoline prices from PVOil
+ * Fetch gasoline prices from webgia.com
  */
 export async function fetchGasolinePrices(): Promise<ParseResult<GasPrice>> {
   try {
-    const response = await fetch(PVOIL_URL);
+    const response = await fetch(WEBGIA_URL, { headers: WEBGIA_HEADERS });
     if (!response.ok) {
       return {
         success: false,
@@ -35,10 +42,10 @@ export async function fetchGasolinePrices(): Promise<ParseResult<GasPrice>> {
 
 /**
  * Parse gasoline prices from HTML
- * Looks for RON95-III and E5 RON92-II in table rows
+ * Looks for RON95-III and E5 RON92-II in the Petrolimex price table
  *
- * NOTE: Selectors may need adjustment if PVOil changes their layout
- * Look for rows containing these product names and extract price values
+ * NOTE: Selectors may need adjustment if webgia changes their layout
+ * Look for rows containing these product names and extract the Vùng 1 price
  */
 export function parseGasolineHTML(html: string): ParseResult<GasPrice> {
   try {
@@ -52,39 +59,23 @@ export function parseGasolineHTML(html: string): ParseResult<GasPrice> {
         .replace(/\s+/g, " ")
         .trim();
 
-    // Strategy: Find rows in price table that contain RON95 and E5 identifiers
-    // PVOil typically uses a table with product name in one column and price in another
+    // Strategy: Find rows in the price table that contain RON95 and E5 identifiers
+    // webgia uses a table with the product name in the first column and region prices after it
 
     let ron95Price: number | null = null;
     let e5Price: number | null = null;
 
-    // Prefer the known price table container used on PVOIL price page.
-    const rows = $(".oilpricescontainer table tbody tr");
+    const rows = $(".table-responsive table tbody tr");
 
     rows.each((_index: number, row: any) => {
-      const cells = $(row).find("td");
+      const cells = $(row).find("th, td");
       const rowText = normalize($(row).text());
 
       if (cells.length < 3) {
         return;
       }
 
-      // Current table shape: [index, name(colspan), price, change]
-      const explicitPrice = parsePrice(cells.eq(2).text().trim());
-
-      // Fallback: find the first price-like cell that contains the currency marker.
-      let fallbackPrice: number | null = null;
-      cells.each((i: number, cell: any) => {
-        if (i < 2) return;
-        const cellText = $(cell).text().trim();
-        if (!cellText.includes("đ")) return;
-        const parsed = parsePrice(cellText);
-        if (parsed !== null && parsed >= 10000) {
-          fallbackPrice = parsed;
-        }
-      });
-
-      const candidatePrice = explicitPrice ?? fallbackPrice;
+      const region1Price = parsePrice(cells.eq(1).text().trim());
 
       // Look for RON 95
       if (
@@ -94,9 +85,8 @@ export function parseGasolineHTML(html: string): ParseResult<GasPrice> {
         (rowText.includes("iii") || rowText.includes("3")) &&
         !rowText.includes("e10")
       ) {
-        const parsed = candidatePrice;
-        if (parsed && isValidGasPrice(parsed)) {
-          ron95Price = parsed;
+        if (region1Price && isValidGasPrice(region1Price)) {
+          ron95Price = region1Price;
         }
       }
 
@@ -107,9 +97,8 @@ export function parseGasolineHTML(html: string): ParseResult<GasPrice> {
         rowText.includes("92") &&
         (rowText.includes("ii") || rowText.includes("2"))
       ) {
-        const parsed = candidatePrice;
-        if (parsed && isValidGasPrice(parsed)) {
-          e5Price = parsed;
+        if (region1Price && isValidGasPrice(region1Price)) {
+          e5Price = region1Price;
         }
       }
     });
