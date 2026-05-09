@@ -11,8 +11,6 @@ on:
   schedule:
     # 08:00 ICT = 01:00 UTC
     - cron: '0 1 * * *'
-    # 08:00 ICT = 01:00 UTC
-    - cron: '0 1 * * *'
     # 15:00 ICT = 08:00 UTC
     - cron: '0 8 * * *'
     # 23:00 ICT = 16:00 UTC
